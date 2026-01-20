@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Car Animation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            font-family: sans-serif;
+        }
+
+        /* Main scene container */
+        .scene {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Layer 1: Sky - FIXED BACKGROUND (does not move) */
+        .sky-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('city_skyline.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: 1;
+        }
+
+        /* Layer 2: City Buildings - Moving in front of sky */
+        .city-layer {
+            position: absolute;
+            bottom: 35vh;
+            left: 0;
+            width: 100%;
+            height: 45vh;
+            background-image: url('city.png');
+            background-repeat: repeat-x;
+            background-position: bottom center;
+            background-size: auto 100%;
+            z-index: 2;
+        }
+
+        /* Layer 3: Road - Moving faster than city */
+        .road-layer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 35vh;
+            background-image: url('road.png');
+            background-repeat: repeat-x;
+            background-position: center;
+            background-size: auto 100%;
+            z-index: 3;
+        }
+
+        /* Layer 4: Car - Moving left to right on road */
+        .car-container {
+            position: absolute;
+            bottom: 32vh;
+            width: 300px;
+            height: 150px;
+            z-index: 4;
+        }
+
+        /* Wheels - Positioned exactly in car's wheel wells */
+        .wheel {
+            position: absolute;
+            width: 56px;
+            height: 56px;
+            background-image: url('car_wheel.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            bottom: 10px;
+        }
+
+        .wheel.rear {
+            left: 45px;
+        }
+
+        .wheel.front {
+            right: 35px;
+        }
+
+        /* Car body - Over the wheels */
+        .car-body {
+            position: absolute;
+            width: 300px;
+            height: 156px;
+            background-image: url('car.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center center;
+            top: 0;
+            left: 0;
+        }
+
+        /* Responsive scaling */
+        @media (max-width: 768px) {
+            .car-container {
+                transform: scale(0.7);
+                transform-origin: bottom left;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .car-container {
+                transform: scale(0.5);
+                transform-origin: bottom left;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="scene">
+        <!-- Layer 1: Sky (FIXED - Does NOT Move) -->
+        <div class="sky-layer" id="skyLayer"></div>
+
+        <!-- Layer 2: City Buildings (Moves Right to Left) -->
+        <div class="city-layer" id="cityLayer"></div>
+
+        <!-- Layer 3: Road (Moves Right to Left, Faster) -->
+        <div class="road-layer" id="roadLayer"></div>
+
+        <!-- Layer 4: Car with Wheels (Moves Left to Right) -->
+        <div class="car-container" id="carContainer">
+            <!-- Wheels behind car body -->
+            <div class="wheel rear" id="wheelRear"></div>
+            <div class="wheel front" id="wheelFront"></div>
+            <!-- Car body on top -->
+            <div class="car-body" id="carBody"></div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // ANIMATION CONFIGURATION
+        // ============================================
+        const config = {
+            carSpeed: 10.0,              // Car movement speed: LEFT → RIGHT
+            citySpeed: 1.5,             // City movement speed: RIGHT → LEFT (medium)
+            roadSpeed: 7.5,             // Road movement speed: RIGHT → LEFT (faster)
+            wheelRotationSpeed: 12,     // Wheel rotation (degrees per frame)
+            suspensionFrequency: 0.2,  // Bounce frequency
+            suspensionAmplitude: 0.5   // Bounce height (pixels)
+        };
+
+        // ============================================
+        // ANIMATION STATE
+        // ============================================
+        let state = {
+            carPosition: -350,          // Car starts off-screen LEFT
+            cityOffset: 0,              // City parallax offset
+            roadOffset: 0,              // Road parallax offset
+            wheelRotation: 0,           // Current wheel angle
+            time: 0                     // Time for suspension bounce
+        };
+
+        // ============================================
+        // DOM ELEMENTS
+        // ============================================
+        const carContainer = document.getElementById('carContainer');
+        const carBody = document.getElementById('carBody');
+        const cityLayer = document.getElementById('cityLayer');
+        const roadLayer = document.getElementById('roadLayer');
+        const wheelFront = document.getElementById('wheelFront');
+        const wheelRear = document.getElementById('wheelRear');
+
+        // ============================================
+        // MAIN ANIMATION LOOP
+        // ============================================
+        function animate() {
+            // 1. CAR MOVES LEFT → RIGHT
+            state.carPosition += config.carSpeed;
+            
+            // Loop car back to left when it exits right
+            if (state.carPosition > window.innerWidth + 50) {
+                state.carPosition = -350;
+            }
+
+            // 2. CITY MOVES RIGHT → LEFT (Medium Speed)
+            state.cityOffset -= config.citySpeed;
+
+            // 3. ROAD MOVES RIGHT → LEFT (Faster Speed)
+            state.roadOffset -= config.roadSpeed;
+
+            // 4. WHEEL ROTATION (Matches car forward motion)
+            state.wheelRotation += config.wheelRotationSpeed;
+            if (state.wheelRotation >= 360) {
+                state.wheelRotation -= 360;
+            }
+
+            // 5. SUSPENSION BOUNCE TIME
+            state.time += config.suspensionFrequency;
+
+            // 6. APPLY ALL TRANSFORMS
+            applyTransforms();
+
+            // 7. CONTINUE ANIMATION
+            requestAnimationFrame(animate);
+        }
+
+        // ============================================
+        // APPLY VISUAL TRANSFORMS
+        // ============================================
+        function applyTransforms() {
+            // SKY: FIXED - No movement (stays in background)
+            
+            // CITY: Moving RIGHT → LEFT (background-position for seamless scrolling)
+            cityLayer.style.backgroundPosition = `${state.cityOffset}px bottom`;
+
+            // ROAD: Moving RIGHT → LEFT (faster than city)
+            roadLayer.style.backgroundPosition = `${state.roadOffset}px center`;
+
+            // CAR: Moving LEFT → RIGHT (horizontal position)
+            carContainer.style.left = `${state.carPosition}px`;
+
+            // CAR SUSPENSION BOUNCE (up and down motion)
+            const bounceOffset = Math.sin(state.time) * config.suspensionAmplitude;
+            carBody.style.transform = `translateY(${bounceOffset}px)`;
+
+            // WHEEL ROTATION (both wheels rotate synchronously)
+            const rotationTransform = `rotate(${state.wheelRotation}deg)`;
+            wheelFront.style.transform = rotationTransform;
+            wheelRear.style.transform = rotationTransform;
+        }
+
+        // ============================================
+        // START ANIMATION
+        // ============================================
+        window.addEventListener('load', () => {
+            animate();
+        });
+
+        // ============================================
+        // HANDLE WINDOW RESIZE
+        // ============================================
+        window.addEventListener('resize', () => {
+            // Reset car if it's off-screen after resize
+            if (state.carPosition > window.innerWidth + 50) {
+                state.carPosition = -350;
+            }
+        });
+    </script>
+</body>
+</html>
